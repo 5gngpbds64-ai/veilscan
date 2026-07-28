@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VeilScan | Veil Public Ledger Explorer</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{
+    --bg:#0A0A0C; --bg-alt:#0D0E11;
+    --surface:#141519; --surface-2:#1A1C21; --surface-3:#232529;
+    --line:#232529; --line-strong:#2E3037;
+    --text:#EDEEF0; --text-dim:#C4C6CB; --muted:#85888F; --muted-2:#55585F;
+    --accent:#4C8DFF; --accent-dim:rgba(76,141,255,0.12); --accent-strong:#7BAAFF;
+    --green:#2ECC80; --green-dim:rgba(46,204,128,0.12);
+    --red:#F2545B; --red-dim:rgba(242,84,91,0.12);
+    --orange:#E1962C; --orange-dim:rgba(225,150,44,0.12);
+    --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html, body{
+    background:var(--bg); color:var(--text); min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    font-size:13px;
+  }
+  a{ color:inherit; text-decoration:none; }
+  ::selection{ background:var(--accent-dim); }
+
+  /* ---------- Top utility bar ---------- */
+  .util-bar{ background:var(--surface); border-bottom:1px solid var(--line); }
+  .util-bar-inner{
+    max-width:1180px; margin:0 auto; padding:8px 20px; display:flex; align-items:center; gap:18px; font-size:12.5px;
+  }
+  .util-stat{ color:var(--muted); font-weight:500; flex-shrink:0; }
+  .util-stat b{ color:var(--text); font-weight:700; }
+  .util-stat .up{ color:var(--green); font-weight:700; }
+  .util-stat .down{ color:var(--red); font-weight:700; }
+  .util-search{
+    flex:1; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line-strong);
+    border-radius:6px; padding:7px 12px; max-width:560px; transition:border-color .15s ease;
+  }
+  .util-search:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+  .util-search input{ background:none; border:none; outline:none; color:var(--text); font-size:12.5px; flex:1; font-family:var(--mono); }
+  .util-search input::placeholder{ color:var(--muted-2); font-family:-apple-system,sans-serif; }
+  .util-search svg{ color:var(--muted); flex-shrink:0; }
+  .util-right{ display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .util-live{ display:flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; color:var(--green); }
+  .util-live-dot{ width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+
+  /* ---------- Brand bar ---------- */
+  .brand-bar{ background:var(--surface); border-bottom:1px solid var(--line); }
+  .brand-bar-inner{ max-width:1180px; margin:0 auto; padding:10px 20px; display:flex; align-items:center; gap:20px; }
+  .brand{ display:flex; align-items:center; gap:8px; cursor:pointer; flex-shrink:0; }
+  .brand-mark{
+    width:26px; height:26px; border-radius:7px; background:linear-gradient(150deg, var(--accent), #0F52A0);
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; color:#fff; flex-shrink:0;
+  }
+  .brand-name{ font-size:16px; font-weight:800; letter-spacing:-0.3px; color:var(--text); }
+  .nav-links{ display:flex; align-items:center; gap:4px; }
+  .nav-link{
+    font-size:12.5px; font-weight:600; color:var(--muted); padding:6px 10px; border-radius:6px; cursor:pointer;
+    transition:background .12s ease, color .12s ease;
+  }
+  .nav-link:hover, .nav-link.active{ background:var(--accent-dim); color:var(--accent-strong); }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:22px 20px 80px; }
+
+  .page-title-row{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .page-title{ font-size:19px; font-weight:700; color:var(--text); letter-spacing:-0.2px; }
+  .api-pill{
+    font-size:11px; font-weight:700; color:var(--muted); background:var(--surface); border:1px solid var(--line-strong);
+    padding:4px 9px; border-radius:6px;
+  }
+
+  /* ---------- Stats strip ---------- */
+  .stats-strip{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:20px; }
+  .stat-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px 16px; box-shadow:var(--shadow); }
+  .stat-label{ font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:7px; }
+  .stat-value{ font-size:19px; font-weight:800; color:var(--text); letter-spacing:-0.2px; font-family:var(--mono); }
+  .stat-sub{ font-size:11px; color:var(--muted-2); margin-top:3px; }
+
+  /* ---------- Two-column latest section ---------- */
+  .latest-grid{ display:grid; grid-template-columns:320px 1fr; gap:16px; margin-bottom:12px; align-items:start; }
+  .panel{ background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden; box-shadow:var(--shadow); }
+  .panel-header{
+    display:flex; align-items:center; justify-content:space-between; padding:11px 16px;
+    border-bottom:1px solid var(--line); background:var(--surface-2);
+  }
+  .panel-title{ font-size:13px; font-weight:700; color:var(--text); }
+  .panel-link{ font-size:11.5px; font-weight:600; color:var(--accent); cursor:pointer; }
+  .panel-link:hover{ text-decoration:underline; }
+
+  /* ---------- Blocks list ---------- */
+  .block-row{ display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); }
+  .block-row:last-child{ border-bottom:none; }
+  .block-cube{
+    width:30px; height:30px; border-radius:7px; background:var(--surface-3); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .block-num{ font-size:12.5px; font-weight:700; color:var(--accent); font-family:var(--mono); cursor:pointer; }
+  .block-num:hover{ text-decoration:underline; }
+  .block-meta{ font-size:10.5px; color:var(--muted); margin-top:1px; }
+  .block-right{ margin-left:auto; text-align:right; flex-shrink:0; }
+  .block-txns{ font-size:11px; color:var(--text-dim); font-weight:600; }
+  .block-bar-wrap{ width:70px; height:3px; background:var(--surface-3); border-radius:2px; margin-top:5px; overflow:hidden; }
+  .block-bar{ height:100%; border-radius:2px; }
+
+  /* ---------- Transaction table ---------- */
+  .tx-table-wrap{ overflow-x:auto; }
+  table.tx-table{ width:100%; border-collapse:collapse; font-size:12.5px; min-width:760px; }
+  table.tx-table thead th{
+    text-align:left; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px;
+    padding:9px 14px; border-bottom:1px solid var(--line); background:var(--surface-2); white-space:nowrap;
+  }
+  table.tx-table tbody tr{ border-bottom:1px solid var(--line); cursor:pointer; transition:background .1s ease; }
+  table.tx-table tbody tr:hover{ background:var(--accent-dim); }
+  table.tx-table tbody tr:last-child{ border-bottom:none; }
+  table.tx-table td{ padding:9px 14px; vertical-align:middle; white-space:nowrap; }
+  .cell-hash{ font-family:var(--mono); color:var(--accent); font-size:12px; font-weight:600; }
+  .cell-hash:hover{ text-decoration:underline; }
+  .method-pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:5px; }
+  .method-pill.Bought{ background:var(--green-dim); color:var(--green); }
+  .method-pill.Received{ background:var(--green-dim); color:var(--green); }
+  .method-pill.Sent{ background:var(--orange-dim); color:var(--orange); }
+  .method-pill.Swapped{ background:var(--accent-dim); color:var(--accent-strong); }
+  .cell-block{ color:var(--accent); font-family:var(--mono); font-size:12px; font-weight:600; cursor:pointer; }
+  .cell-block:hover{ text-decoration:underline; }
+  .cell-age{ color:var(--muted); font-size:12px; }
+  .cell-addr{ font-family:var(--mono); font-size:12px; color:var(--text-dim); cursor:pointer; }
+  .cell-addr:hover{ color:var(--accent); text-decoration:underline; }
+  .cell-addr.dim{ color:var(--muted-2); cursor:default; }
+  .cell-addr.dim:hover{ color:var(--muted-2); text-decoration:none; }
+  .cell-value{ font-weight:700; color:var(--text); }
+  .cell-value .usd{ color:var(--muted); font-weight:400; margin-left:5px; font-size:11px; }
+  .arrow-icon{ color:var(--muted-2); margin:0 4px; font-size:11px; }
+
+  /* ---------- Pagination ---------- */
+  .pager-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px;
+    border-top:1px solid var(--line); background:var(--surface-2); flex-wrap:wrap;
+  }
+  .pager-info{ font-size:11.5px; color:var(--muted); }
+  .pager-controls{ display:flex; align-items:center; gap:6px; }
+  .pager-btn{
+    background:var(--surface); border:1px solid var(--line-strong); color:var(--text-dim); font-size:11.5px;
+    font-weight:600; padding:6px 10px; border-radius:6px; cursor:pointer; transition:opacity .12s ease, background .12s ease;
+  }
+  .pager-btn:hover:not(:disabled){ background:var(--accent-dim); border-color:var(--accent); color:var(--accent-strong); }
+  .pager-btn:disabled{ opacity:0.4; cursor:default; }
+  .pager-label{ font-size:11.5px; color:var(--text-dim); font-weight:600; padding:0 4px; }
+
+  .empty-state{ text-align:center; padding:50px 20px; color:var(--muted); font-size:13px; }
+  .empty-state svg{ margin-bottom:12px; opacity:0.4; }
+
+  /* ---------- Detail / Address views ---------- */
+  #detail-view, #address-view{ display:none; }
+  .back-link{ display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:12.5px; font-weight:600; margin-bottom:16px; cursor:pointer; }
+  .back-link:hover{ color:var(--text); }
+
+  .detail-hero{
+    display:flex; align-items:center; gap:14px; background:var(--surface); border:1px solid var(--line);
+    border-radius:8px; padding:18px; margin-bottom:16px; box-shadow:var(--shadow);
+  }
+  .detail-hero-icon{ width:42px; height:42px; border-radius:9px; overflow:hidden; flex-shrink:0; border:1px solid var(--line); }
+  .detail-hero-icon svg{ width:100%; height:100%; display:block; }
+  .detail-hero-label{ font-size:10px; font-weight:700; letter-spacing:0.5px; color:var(--muted); text-transform:uppercase; }
+  .detail-hero-title{ font-size:16px; font-weight:700; color:var(--text); margin-top:4px; }
+  .detail-hero-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+  .info-table{ background:var(--surface); border:1px solid var(--line); border-radius:8px; margin-bottom:14px; overflow:hidden; box-shadow:var(--shadow); }
+  .info-row{ display:grid; grid-template-columns:180px 1fr; gap:14px; padding:13px 18px; border-bottom:1px solid var(--line); }
+  .info-row:last-child{ border-bottom:none; }
+  .info-label{ font-size:12px; color:var(--muted); font-weight:600; display:flex; align-items:center; gap:6px; }
+  .info-value{ font-size:12.5px; color:var(--text); font-weight:500; word-break:break-word; }
+  .info-value.mono{ font-family:var(--mono); font-size:12px; }
+  .status-pill{
+    display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; color:var(--green);
+    background:var(--green-dim); padding:3px 9px; border-radius:20px; border:1px solid rgba(31,146,84,0.25);
+  }
+  .copy-btn{
+    background:var(--surface-3); border:1px solid var(--line); color:var(--muted); width:22px; height:22px; border-radius:5px;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; vertical-align:middle; margin-left:6px; font-size:11px;
+  }
+  .copy-btn:hover{ color:var(--accent); border-color:var(--accent); }
+  .section-label{ font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin:20px 0 10px 2px; }
+
+  .addr-stats-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+
+  @media (max-width: 860px){
+    .latest-grid{ grid-template-columns:1fr; }
+    .stats-strip{ grid-template-columns:repeat(2,1fr); }
+    .info-row{ grid-template-columns:1fr; gap:4px; }
+    .addr-stats-row{ grid-template-columns:1fr; }
+    .util-search{ display:none; }
+    .nav-links{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="util-bar">
+  <div class="util-bar-inner">
+    <div class="util-stat">Assets tracked: <b>9</b></div>
+    <div class="util-search">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="search-input" type="text" placeholder="Search by Transaction Hash or Address" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="util-right">
+      <div class="util-live"><span class="util-live-dot"></span>Live</div>
+    </div>
+  </div>
+</div>
+
+<div class="brand-bar">
+  <div class="brand-bar-inner">
+    <div class="brand" onclick="showList()">
+      <div class="brand-mark">V</div>
+      <div class="brand-name">VeilScan</div>
+    </div>
+    <div class="nav-links">
+      <div class="nav-link active" onclick="showList()">Home</div>
+      <div class="nav-link" onclick="showList()">Transactions</div>
+      <div class="nav-link" onclick="showList()">Blocks</div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div id="list-view">
+    <div class="page-title-row">
+      <div class="page-title">Veil Public Ledger</div>
+      <div class="api-pill">&lt;/&gt; API</div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-label">Total Transactions</div>
+        <div class="stat-value" id="stat-total-txns">—</div>
+        <div class="stat-sub">in the visible window</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Latest Block</div>
+        <div class="stat-value" id="stat-latest-block">—</div>
+        <div class="stat-sub">avg block time ~<span id="stat-block-time">12.4</span>s</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Wallets</div>
+        <div class="stat-value" id="stat-active-wallets">—</div>
+        <div class="stat-sub">unique addresses seen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Network</div>
+        <div class="stat-value" style="font-size:15px;">Veil Ledger</div>
+        <div class="stat-sub">9 assets tracked</div>
+      </div>
+    </div>
+
+    <div class="latest-grid">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Latest Blocks</div></div>
+        <div id="blocks-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Latest Transactions</div></div>
+        <div class="tx-table-wrap">
+          <table class="tx-table">
+            <thead>
+              <tr>
+                <th>Txn Hash</th><th>Method</th><th>Block</th><th>Age</th><th>From</th><th></th><th>To</th><th style="text-align:right;">Value</th>
+              </tr>
+            </thead>
+            <tbody id="tx-table-body"></tbody>
+          </table>
+        </div>
+        <div class="pager-row">
+          <div class="pager-info" id="pager-info">—</div>
+          <div class="pager-controls">
+            <button class="pager-btn" id="pager-first" onclick="goToPage(1)">First</button>
+            <button class="pager-btn" id="pager-prev" onclick="goToPage(currentPage-1)">‹ Prev</button>
+            <span class="pager-label" id="pager-label">Page 1</span>
+            <button class="pager-btn" id="pager-next" onclick="goToPage(currentPage+1)">Next ›</button>
+            <button class="pager-btn" id="pager-last" onclick="goToPage(totalPages())">Last</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="detail-view">
+    <div class="back-link" onclick="showList()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      Back to transactions
+    </div>
+    <div class="detail-hero">
+      <div class="detail-hero-icon" id="d-tx-logo"></div>
+      <div>
+        <div class="detail-hero-label">Transaction Details</div>
+        <div class="detail-hero-title" id="d-tx-heading">—</div>
+        <div class="detail-hero-sub" id="d-tx-value">—</div>
+      </div>
+    </div>
+    <div class="info-table">
+      <div class="info-row">
+        <div class="info-label">Transaction Hash</div>
+        <div class="info-value mono" id="d-tx-hash">— <button class="copy-btn" onclick="copyText('d-tx-hash')">⧉</button></div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Status</div>
+        <div class="info-value"><span class="status-pill"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Success</span></div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Block</div>
+        <div class="info-value mono" id="d-tx-block">—</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Timestamp</div>
+        <div class="info-value" id="d-tx-date">—</div>
+      </div>
+    </div>
+    <div class="info-table">
+      <div class="info-row">
+        <div class="info-label" id="d-tx-cp-label">From</div>
+        <div class="info-value mono" id="d-tx-from">—</div>
+      </div>
+      <div class="info-row" id="d-tx-to-row">
+        <div class="info-label">To</div>
+        <div class="info-value mono" id="d-tx-to">—</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Value</div>
+        <div class="info-value" id="d-tx-amount">—</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Transaction Fee</div>
+        <div class="info-value" id="d-tx-fee">—</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Gas Price</div>
+        <div class="info-value mono" id="d-tx-gas">—</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">Nonce</div>
+        <div class="info-value mono" id="d-tx-nonce">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="address-view">
+    <div class="back-link" onclick="showList()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      Back to transactions
+    </div>
+    <div class="detail-hero">
+      <div class="detail-hero-icon" style="background:var(--surface-3); display:flex; align-items:center; justify-content:center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#85888F" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      </div>
+      <div>
+        <div class="detail-hero-label">Address</div>
+        <div class="detail-hero-title info-value mono" id="a-address" style="font-size:13px;">—</div>
+      </div>
+    </div>
+    <div class="addr-stats-row">
+      <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value" id="a-tx-count">—</div></div>
+      <div class="stat-card"><div class="stat-label">First Seen</div><div class="stat-value" style="font-size:13px;" id="a-first-seen">—</div></div>
+      <div class="stat-card"><div class="stat-label">Last Seen</div><div class="stat-value" style="font-size:13px;" id="a-last-seen">—</div></div>
+    </div>
+    <div class="section-label">Transaction History</div>
+    <div class="panel">
+      <div class="tx-table-wrap">
+        <table class="tx-table">
+          <thead><tr><th>Txn Hash</th><th>Method</th><th>Block</th><th>Age</th><th>From</th><th></th><th>To</th><th style="text-align:right;">Value</th></tr></thead>
+          <tbody id="addr-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, query, orderBy, limit, onSnapshot, where, getDocs
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC-Hx86meaXo-lptSSuij5cnKi-DUXRSBs",
+    authDomain: "veil-99263.firebaseapp.com",
+    projectId: "veil-99263",
+    storageBucket: "veil-99263.firebasestorage.app",
+    messagingSenderId: "410710513338",
+    appId: "1:410710513338:web:b2df379d940c68a92c1483"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  /* ---------- Shared helpers ---------- */
+  function hashSeed(str){
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return function(){
+      h = Math.imul(h ^ (h >>> 16), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    };
+  }
+  function coinIconSVG(coinColor, ticker){
+    return `<svg viewBox="0 0 40 40" width="100%" height="100%"><rect width="40" height="40" rx="12" fill="${coinColor}"/><text x="20.5" y="27" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="16" font-weight="800" fill="#fff">${(ticker||'?').charAt(0)}</text></svg>`;
+  }
+  function shortHash(h, front, back){
+    front = front || 8; back = back || 6;
+    if(!h) return '—';
+    return h.length <= front+back+1 ? h : h.slice(0,front)+'…'+h.slice(-back);
+  }
+  function fmtAmount(n){ return Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }); }
+  function fmtUsd(n){
+    const sign = n<0?'-':''; const abs = Math.abs(n);
+    const parts = abs.toFixed(2).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return sign+'$'+parts[0]+'.'+parts[1];
+  }
+  function relativeTime(ts){
+    const s = Math.floor((Date.now()-ts)/1000);
+    if(s<5) return 'just now';
+    if(s<60) return s+'s ago';
+    if(s<3600) return Math.floor(s/60)+'m ago';
+    if(s<86400) return Math.floor(s/3600)+'h ago';
+    return Math.floor(s/86400)+'d ago';
+  }
+  function blockForTx(tx){
+    const seed = hashSeed('scanmeta-'+(tx.txId||'x'));
+    return { num: 18000000 + Math.floor(seed()*9999999), seedFn: seed };
+  }
+  function isRealAddress(addr){
+    return typeof addr === 'string' && addr.length === 34;
+  }
+
+  /* ---------- Simulated live activity (client-side only) ---------- */
+  const SIM_COINS = [
+    { id:'btc', name:'Bitcoin', ticker:'BTC', color:'#F7931A', price:64150 },
+    { id:'eth', name:'Ethereum', ticker:'ETH', color:'#627EEA', price:1858 },
+    { id:'sol', name:'Solana', ticker:'SOL', color:'#000000', price:74.20 },
+    { id:'doge', name:'Dogecoin', ticker:'DOGE', color:'#C2A633', price:0.0693 },
+    { id:'ltc', name:'Litecoin', ticker:'LTC', color:'#345D9D', price:46.80 },
+    { id:'xrp', name:'XRP', ticker:'XRP', color:'#23292F', price:1.10 },
+    { id:'xmr', name:'Monero', ticker:'XMR', color:'#FF6600', price:351.10 },
+    { id:'ada', name:'Cardano', ticker:'ADA', color:'#0033AD', price:0.163 },
+    { id:'avax', name:'Avalanche', ticker:'AVAX', color:'#E84142', price:123.62 },
+  ];
+  const SIM_TYPES = ['Bought', 'Sent', 'Received', 'Swapped'];
+  function simAddress(){
+    const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    return Array.from({length:34}, ()=> chars[Math.floor(Math.random()*chars.length)]).join('');
+  }
+  function simTxId(){
+    const chars = '0123456789abcdef';
+    return Array.from({length:16}, ()=> chars[Math.floor(Math.random()*16)]).join('');
+  }
+  function randomUsdValue(){
+    const min = 0.01, max = 75000;
+    return Math.exp(Math.random() * Math.log(max/min)) * min;
+  }
+  function generateFakeTx(){
+    const coin = SIM_COINS[Math.floor(Math.random()*SIM_COINS.length)];
+    const type = SIM_TYPES[Math.floor(Math.random()*SIM_TYPES.length)];
+    const usdValue = randomUsdValue();
+    const amount = usdValue / coin.price;
+    const tx = {
+      txId: simTxId(), type, coinId: coin.id, coinName: coin.name, coinTicker: coin.ticker, coinColor: coin.color,
+      amount, priceUsd: coin.price, accountAddress: simAddress(), accountName: null, clientTs: Date.now(), _sim: true,
+    };
+    if(type === 'Sent' || type === 'Received'){ tx.counterparty = simAddress(); }
+    else if(type === 'Swapped'){
+      const otherCoin = SIM_COINS[Math.floor(Math.random()*SIM_COINS.length)];
+      tx.counterparty = `${fmtAmount(usdValue/otherCoin.price)} ${otherCoin.ticker}`;
+    } else { tx.counterparty = null; }
+    return tx;
+  }
+
+  let realTxs = [];
+  let simTxs = [];
+  const MAX_TOTAL = 100;
+  const PAGE_SIZE = 15;
+  window.currentPage = 1;
+  let lastRenderedTable = [];
+  let lastRenderedAddrTable = [];
+
+  function combinedTxs(){
+    return simTxs.concat(realTxs).sort((a,b) => b.clientTs - a.clientTs).slice(0, MAX_TOTAL);
+  }
+  window.totalPages = function(){
+    return Math.max(1, Math.ceil(combinedTxs().length / PAGE_SIZE));
+  };
+
+  /* ---------- Address resolution (from/to labels) ---------- */
+  function fromToFor(tx){
+    if(tx.type === 'Bought'){
+      return { from: null, fromLabel: 'Instant Buy', to: tx.accountAddress, toLabel: null };
+    }
+    if(tx.type === 'Sent'){
+      return { from: tx.accountAddress, fromLabel: null, to: tx.counterparty, toLabel: isRealAddress(tx.counterparty) ? null : 'Unknown' };
+    }
+    if(tx.type === 'Received'){
+      return { from: tx.counterparty, fromLabel: isRealAddress(tx.counterparty) ? null : 'Unknown', to: tx.accountAddress, toLabel: null };
+    }
+    if(tx.type === 'Swapped'){
+      return { from: null, fromLabel: (tx.counterparty || 'Swap'), to: tx.accountAddress, toLabel: null };
+    }
+    return { from: null, fromLabel: 'External', to: tx.accountAddress, toLabel: null };
+  }
+
+  /* ---------- Rendering: stats ---------- */
+  function renderStats(txs){
+    document.getElementById('stat-total-txns').textContent = txs.length >= MAX_TOTAL ? MAX_TOTAL+'+' : txs.length;
+    if(txs.length){
+      const latest = txs.reduce((max,t)=> Math.max(max, blockForTx(t).num), 0);
+      document.getElementById('stat-latest-block').textContent = latest.toLocaleString();
+    }
+    const addrs = new Set();
+    txs.forEach(t=>{
+      if(isRealAddress(t.accountAddress)) addrs.add(t.accountAddress);
+      if(isRealAddress(t.counterparty)) addrs.add(t.counterparty);
+    });
+    document.getElementById('stat-active-wallets').textContent = addrs.size;
+  }
+
+  /* ---------- Rendering: blocks panel ---------- */
+  function renderBlocks(txs){
+    const byBlock = new Map();
+    txs.forEach(t=>{
+      const b = blockForTx(t);
+      if(!byBlock.has(b.num)) byBlock.set(b.num, { num:b.num, count:0, ts:t.clientTs, seed:b.seedFn });
+      const entry = byBlock.get(b.num);
+      entry.count++;
+      entry.ts = Math.max(entry.ts, t.clientTs);
+    });
+    const blocks = [...byBlock.values()].sort((a,b)=> b.num - a.num).slice(0, 9);
+    const list = document.getElementById('blocks-list');
+    if(!blocks.length){
+      list.innerHTML = `<div class="empty-state" style="padding:28px 16px;">No blocks yet.</div>`;
+      return;
+    }
+    list.innerHTML = blocks.map(b=>{
+      const pct = Math.min(99, Math.round(20 + b.seed()*79));
+      const barColor = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--orange)' : 'var(--accent)';
+      return `
+        <div class="block-row">
+          <div class="block-cube">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#85888F" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <div>
+            <div class="block-num" data-action="none">${b.num.toLocaleString()}</div>
+            <div class="block-meta">${relativeTime(b.ts)}</div>
+          </div>
+          <div class="block-right">
+            <div class="block-txns">${b.count} txn${b.count===1?'':'s'}</div>
+            <div class="block-bar-wrap"><div class="block-bar" style="width:${pct}%; background:${barColor};"></div></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ---------- Rendering: transaction table rows ---------- */
+  function txRowHtml(tx, idx, tableId){
+    const isIn = tx.type==='Received' || tx.type==='Bought' || tx.type==='Swapped';
+    const sign = isIn ? '+' : '-';
+    const block = blockForTx(tx);
+    const ft = fromToFor(tx);
+    const fromCell = ft.from
+      ? `<span class="cell-addr" data-action="address" data-value="${ft.from}">${shortHash(ft.from,6,4)}</span>`
+      : `<span class="cell-addr dim">${ft.fromLabel}</span>`;
+    const toCell = ft.to
+      ? `<span class="cell-addr" data-action="address" data-value="${ft.to}">${shortHash(ft.to,6,4)}</span>`
+      : `<span class="cell-addr dim">${ft.toLabel||'—'}</span>`;
+    return `
+      <tr data-idx="${idx}" data-table="${tableId}">
+        <td><span class="cell-hash" data-action="detail" data-idx="${idx}" data-table="${tableId}">${shortHash(tx.txId,10,8)}</span></td>
+        <td><span class="method-pill ${tx.type}">${tx.type}</span></td>
+        <td><span class="cell-block" data-action="none">${block.num.toLocaleString()}</span></td>
+        <td><span class="cell-age">${relativeTime(tx.clientTs)}</span></td>
+        <td>${fromCell}</td>
+        <td><span class="arrow-icon">→</span></td>
+        <td>${toCell}</td>
+        <td style="text-align:right;">
+          <span class="cell-value">${sign}${fmtAmount(tx.amount)} ${tx.coinTicker}<span class="usd">${fmtUsd(tx.amount*tx.priceUsd)}</span></span>
+        </td>
+      </tr>`;
+  }
+
+  function renderTable(){
+    const all = combinedTxs();
+    const totalP = window.totalPages();
+    if(window.currentPage > totalP) window.currentPage = totalP;
+    if(window.currentPage < 1) window.currentPage = 1;
+    const startIdx = (window.currentPage-1)*PAGE_SIZE;
+    const shown = all.slice(startIdx, startIdx+PAGE_SIZE);
+    lastRenderedTable = shown;
+    const tbody = document.getElementById('tx-table-body');
+    if(!shown.length){
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <div>No transactions yet.</div></div></td></tr>`;
+    } else {
+      tbody.innerHTML = shown.map((tx,i)=> txRowHtml(tx, i, 'main')).join('');
+    }
+
+    document.getElementById('pager-info').textContent =
+      all.length ? `Showing ${startIdx+1} to ${Math.min(startIdx+PAGE_SIZE, all.length)} of ${all.length} transactions` : 'No transactions';
+    document.getElementById('pager-label').textContent = `Page ${window.currentPage} of ${totalP}`;
+    document.getElementById('pager-first').disabled = window.currentPage <= 1;
+    document.getElementById('pager-prev').disabled = window.currentPage <= 1;
+    document.getElementById('pager-next').disabled = window.currentPage >= totalP;
+    document.getElementById('pager-last').disabled = window.currentPage >= totalP;
+
+    renderStats(all);
+    renderBlocks(all);
+  }
+  window.goToPage = function(p){
+    window.currentPage = p;
+    renderTable();
+  };
+
+  setInterval(() => {
+    simTxs.unshift(generateFakeTx());
+    if(simTxs.length > MAX_TOTAL) simTxs.length = MAX_TOTAL;
+    if(document.getElementById('list-view').style.display !== 'none' && window.currentPage === 1) renderTable();
+  }, 3000);
+  for(let i=0; i<12; i++){
+    const tx = generateFakeTx();
+    tx.clientTs = Date.now() - i*40000;
+    simTxs.push(tx);
+  }
+  renderTable();
+
+  const q = query(collection(db, 'transactions'), orderBy('clientTs', 'desc'), limit(50));
+  onSnapshot(q, (snap) => {
+    realTxs = snap.docs.map(d => d.data());
+    if(document.getElementById('list-view').style.display !== 'none') renderTable();
+  }, (err) => { console.error('Live transactions unavailable:', err.code || err.message); });
+
+  /* ---------- View switching ---------- */
+  window.showList = function(){
+    document.getElementById('list-view').style.display = 'block';
+    document.getElementById('detail-view').style.display = 'none';
+    document.getElementById('address-view').style.display = 'none';
+    history.replaceState(null, '', location.pathname);
+    renderTable();
+  };
+
+  window.showDetail = function(tx){
+    document.getElementById('list-view').style.display = 'none';
+    document.getElementById('address-view').style.display = 'none';
+    document.getElementById('detail-view').style.display = 'block';
+
+    document.getElementById('d-tx-logo').innerHTML = coinIconSVG(tx.coinColor, tx.coinTicker);
+    document.getElementById('d-tx-heading').textContent = `${tx.type} ${fmtAmount(tx.amount)} ${tx.coinTicker}`;
+    document.getElementById('d-tx-value').textContent = fmtUsd(tx.amount*tx.priceUsd);
+    document.getElementById('d-tx-hash').innerHTML = (tx.txId?('0x'+tx.txId):'—') + ` <button class="copy-btn" onclick="copyText('d-tx-hash')">⧉</button>`;
+
+    const block = blockForTx(tx);
+    document.getElementById('d-tx-block').textContent = block.num.toLocaleString();
+    const d = new Date(tx.clientTs);
+    document.getElementById('d-tx-date').textContent =
+      `${relativeTime(tx.clientTs)} (${d.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})})`;
+
+    const ft = fromToFor(tx);
+    document.getElementById('d-tx-cp-label').textContent = 'From';
+    document.getElementById('d-tx-from').innerHTML = ft.from
+      ? `<span class="cell-addr" data-action="address" data-value="${ft.from}">${ft.from}</span>`
+      : (ft.fromLabel || '—');
+    const toRow = document.getElementById('d-tx-to-row');
+    if(ft.to){
+      toRow.style.display = 'grid';
+      document.getElementById('d-tx-to').innerHTML = `<span class="cell-addr" data-action="address" data-value="${ft.to}">${ft.to}</span>`;
+    } else {
+      toRow.style.display = 'none';
+    }
+
+    document.getElementById('d-tx-amount').textContent = `${fmtAmount(tx.amount)} ${tx.coinTicker} (${fmtUsd(tx.amount*tx.priceUsd)})`;
+
+    const seed = block.seedFn;
+    const feeCoin = SIM_COINS.find(c=>c.id==='eth');
+    const feeUsd = (0.5) * (0.7 + seed()*0.6);
+    document.getElementById('d-tx-fee').textContent = `${(feeUsd/feeCoin.price).toFixed(6)} ETH (${fmtUsd(feeUsd)})`;
+    document.getElementById('d-tx-gas').textContent = `${(0.4+seed()*2.5).toFixed(2)} Gwei`;
+    document.getElementById('d-tx-nonce').textContent = Math.floor(seed()*500000);
+
+    history.replaceState(null, '', '?tx=' + encodeURIComponent(tx.txId));
+  };
+
+  window.showAddress = function(address){
+    document.getElementById('list-view').style.display = 'none';
+    document.getElementById('detail-view').style.display = 'none';
+    document.getElementById('address-view').style.display = 'block';
+
+    document.getElementById('a-address').textContent = address;
+
+    const related = combinedTxs().filter(t => t.accountAddress === address || t.counterparty === address);
+    lastRenderedAddrTable = related;
+    document.getElementById('a-tx-count').textContent = related.length;
+    if(related.length){
+      const sorted = related.slice().sort((a,b)=>a.clientTs-b.clientTs);
+      document.getElementById('a-first-seen').textContent = relativeTime(sorted[0].clientTs);
+      document.getElementById('a-last-seen').textContent = relativeTime(sorted[sorted.length-1].clientTs);
+    } else {
+      document.getElementById('a-first-seen').textContent = '—';
+      document.getElementById('a-last-seen').textContent = '—';
+    }
+
+    const tbody = document.getElementById('addr-table-body');
+    tbody.innerHTML = related.length
+      ? related.map((tx,i)=> txRowHtml(tx, i, 'addr')).join('')
+      : `<tr><td colspan="8"><div class="empty-state">No transactions found for this address in the visible window.</div></td></tr>`;
+
+    history.replaceState(null, '', '?address=' + encodeURIComponent(address));
+  };
+
+  window.copyText = function(elId){
+    const text = document.getElementById(elId).textContent.replace('⧉','').trim();
+    if(navigator.clipboard) navigator.clipboard.writeText(text).catch(()=>{});
+  };
+
+  /* ---------- Click delegation (safe against special characters in data) ---------- */
+  document.body.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if(!el || el.dataset.action === 'none') return;
+    const action = el.dataset.action;
+    if(action === 'detail'){
+      const table = el.dataset.table === 'addr' ? lastRenderedAddrTable : lastRenderedTable;
+      const tx = table[parseInt(el.dataset.idx, 10)];
+      if(tx) window.showDetail(tx);
+    } else if(action === 'address'){
+      window.showAddress(el.dataset.value);
+    }
+  });
+
+  /* ---------- Deep links & search ---------- */
+  async function checkDeepLink(){
+    const params = new URLSearchParams(location.search);
+    const txId = params.get('tx');
+    const addr = params.get('address');
+    if(txId){
+      try{
+        const qq = query(collection(db, 'transactions'), where('txId', '==', txId), limit(1));
+        const snap = await getDocs(qq);
+        if(!snap.empty){ window.showDetail(snap.docs[0].data()); return; }
+      }catch(e){}
+      const local = combinedTxs().find(t=>t.txId===txId);
+      if(local) window.showDetail(local);
+    } else if(addr){
+      window.showAddress(addr);
+    }
+  }
+  checkDeepLink();
+
+  document.getElementById('search-input').addEventListener('keydown', async (e) => {
+    if(e.key !== 'Enter') return;
+    const raw = e.target.value.trim();
+    if(!raw) return;
+    if(isRealAddress(raw.replace(/^0x/,''))){
+      window.showAddress(raw);
+      return;
+    }
+    const val = raw.replace(/^0x/, '');
+    const local = combinedTxs().find(t=>t.txId===val);
+    if(local){ window.showDetail(local); return; }
+    try{
+      const qq = query(collection(db, 'transactions'), where('txId', '==', val), limit(1));
+      const snap = await getDocs(qq);
+      if(!snap.empty){ window.showDetail(snap.docs[0].data()); return; }
+    }catch(err){}
+    alert('No transaction or address found matching that search.');
+  });
+</script>
+</body>
+</html>
